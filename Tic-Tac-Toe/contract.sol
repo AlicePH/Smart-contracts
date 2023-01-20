@@ -11,18 +11,24 @@ contract Game {
     address private owner;
     mapping (address => uint) private payments;
 
-    uint pay = 1/uint256(2);
+    uint pay = 500000000000000000;
     enum SquareState {Empty, X, O}
     SquareState[3][3] board;
 
     constructor (address _player_2) public {
-        require (_player_2 != 0x0);
+        require (_player_2 != 0x0, "Enter address of second player to deploy");
         player_1=msg.sender;
         player_2=_player_2;
     }
 
-    function paytoStart() public payable{
-        payments[msg.sender] = msg.value;
+    function paytoStart() public payable {
+        payments[msg.sender] += msg.value;
+
+        if(payments[msg.sender] - pay > 0){
+            msg.sender.transfer(payments[msg.sender] - pay); //returns extra money
+            payments[msg.sender]=pay;
+        }
+    
     }
 
     function Move(uint8 xpos, uint8 ypos) public {
@@ -31,18 +37,37 @@ contract Game {
         require (msg.sender == currentPlayerAddress(), "It is not your turn");
         require (positionIsInBounds(xpos, ypos), "Wrong position numbers");
         require (board[xpos][ypos] == SquareState.Empty, "There is already a digit on this position");
-        require (payments[msg.sender] > pay, "Pay 0.5 ETH to start (500 Finney)");
+        require (payments[msg.sender] >= pay, "Pay 0.5 ETH to start (500 Finney)");
 
         board[xpos][ypos] = currentPlayerShape();
         current_move+=1;
+
+        if (isGameOver()) {
+            //if after this move game stopped, it means that this player won and money will be transfered automatically
+            owner=winner(); 
+            if (owner != 0x0) {
+                owner.transfer(address(this).balance);
+            }
+            else {
+                player_1.transfer(pay);
+                player_2.transfer(pay);
+            }
+            
+        }
     }
 
-    function take_money() public { 
-        owner=winner(); 
-        require (isGameOver(), "Game is not over");
-        require (msg.sender == owner, "You did not win");
+    // function take_money() public { 
+    //     owner=winner(); 
+    //     require (isGameOver(), "Game is not over");
+    //     require (msg.sender == owner, "You did not win");
         
-        owner.transfer(address(this).balance);   
+    //     owner.transfer(address(this).balance);   
+    // }
+
+    function take_bet_back() public {  
+        require (current_move == 0, "Game already started");  //if game have not already started we can take our bet back 
+        msg.sender.transfer(payments[msg.sender]);  
+        payments[msg.sender]=0; 
     }
 
     
