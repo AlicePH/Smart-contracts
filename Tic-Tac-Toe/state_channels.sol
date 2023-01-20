@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: MIT
+
+//X -sign for the first player, O - sign of the second player, and * if the field is Empty
+//there can be any bet amount, even 0, but the first player defines it
+
 pragma solidity ^0.4.26;
 
 contract Game {
     
     address private player1; //puts "X"
     address private player2; //puts "O"
-    //address public gameWinner;
     uint256 public betAmount; //first player can make any bet
     bool private gameOver;
     int private board_x=0;
     int private board_o=0;
+    address public gameWinner;
 
     address private owner;
     uint new_nonce=0;
@@ -36,6 +40,7 @@ contract Game {
     uint256 private timeout; // time when some actions start (time now+timeoutInterval)
     bytes32 private player1move;
     bytes32 private player2move;
+    mapping (address => uint) private payments;
 
 
     bytes32 private temp1=0x5800000000000000000000000000000000000000000000000000000000000000; //X
@@ -53,20 +58,19 @@ contract Game {
         require(player2 == address(0), "Game has already started.");
         require(player1 != msg.sender, "The game owner cannot join their own game");
         require(!gameOver, "Game was canceled.");
-        require(msg.value == betAmount, "Wrong bet amount."); //fix this moment!
+        require(msg.value == betAmount, "Wrong bet amount."); 
 
+        
         player2 = msg.sender;
-        // state.whoseTurn = player1;
         timeout = block.timestamp + timeoutInterval;
     }
+
 
     function cancel() public {
         require(msg.sender == player1, "Only first player may cancel.");
         require(player2 == address(0), "Game has already started.");
 
         gameOver = true;
-        //winner=
-        //payable(winner).transfer(address(this).balance);
     }
 
     function stringToBytes32(string memory source) private pure returns (bytes32 result) {
@@ -117,7 +121,6 @@ contract Game {
         require(msg.sender == player1, "Only first player may commit, but you can disagree with submission later.");
         require (player2 != address(0), "Second player did not join");
         require(!gameOver, "Game has ended.");
-        // require(state.nonce == nonce, "Incorrect nonce number.");
         require(block.timestamp < timeout, "Moves closed"); // Only allow commits during committing period
 
         state.player1commit_row_1 = row_1;
@@ -192,7 +195,7 @@ contract Game {
 
     }
 
-    function winner() private returns (address) {
+    function winner() private {
         //require (isGameOver(), "Game is not over");
         board_x=0;
         board_o=0;
@@ -209,14 +212,14 @@ contract Game {
 
         SquareState winning_shape = winningPlayerShape();
         if(winning_shape == SquareState.X) {
-            return player1;
+            gameWinner=player1;
         } 
         else {
             if (winning_shape == SquareState.O) {
-                return player2;
+                gameWinner=player2;
             }
         }
-        return 0x0; //in case of draw returns 0x0
+        gameWinner=0x0; //in case of draw returns 0x0
     }
 
     function argue(uint8 nonce, string memory _row_1, string memory _row_2, string memory _row_3) public {
@@ -224,7 +227,7 @@ contract Game {
         bytes32 row_2=stringToBytes32(_row_2);
         bytes32 row_3=stringToBytes32(_row_3);
         
-        require (nonce > state.nonce);
+        require (nonce > state.nonce, "You don't have the latest version of game");
         state.nonce=nonce;
 
         require(msg.sender == player2, "Only second player can argue");
@@ -247,17 +250,19 @@ contract Game {
         board[2][1]=bytes_to_squarestate(row_3[1]);
         board[2][2]=bytes_to_squarestate(row_3[2]);
 
+        new_nonce=1;
+
     }
 
     function take_money() public { 
-        owner=winner(); 
+        owner=gameWinner; 
         require (isGameOver(), "Game is not over");
         require (block.timestamp > timeout || new_nonce == 1, "Time to argue with the first submission");
         require (msg.sender == owner || owner == address(0), "You did not win");
 
         if (isGameOver()) {
             //if after this move game stopped, it means that this player won and money will be transfered automatically
-            owner=winner(); 
+            owner=gameWinner; 
             if (owner != 0x0) {
                 owner.transfer(address(this).balance);
             }
