@@ -195,7 +195,7 @@ contract Game {
 
     }
 
-    function winner() private {
+    function winner() private returns (address gamewinner){
         //require (isGameOver(), "Game is not over");
         board_x=0;
         board_o=0;
@@ -213,13 +213,16 @@ contract Game {
         SquareState winning_shape = winningPlayerShape();
         if(winning_shape == SquareState.X) {
             gameWinner=player1;
+            return gameWinner;
         } 
         else {
             if (winning_shape == SquareState.O) {
                 gameWinner=player2;
+                return gameWinner;
             }
         }
         gameWinner=0x0; //in case of draw returns 0x0
+        return gameWinner;
     }
 
     function argue(uint8 nonce, string memory _row_1, string memory _row_2, string memory _row_3) public {
@@ -255,7 +258,7 @@ contract Game {
     }
 
     function take_money() public { 
-        owner=gameWinner; 
+        owner=winner (); 
         require (isGameOver(), "Game is not over");
         require (block.timestamp > timeout || new_nonce == 1, "Time to argue with the first submission");
         require (msg.sender == owner || owner == address(0), "You did not win");
